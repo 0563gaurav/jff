@@ -16,8 +16,8 @@ sleep 10
 $LFS/sources
 tar -xvf binutils-2.35.tar.xz
 cd binutils-2.35
-mkdir binutils-build
-cd binutils-build
+mkdir build
+cd build
 ../configure --prefix=$LFS/tools \
 	--with-sysroot=$LFS 	 \
 	--target=$LFS_TGT	 \
@@ -26,7 +26,7 @@ cd binutils-build
 make 
 make install 
 cd ../../
-rm -rf binutils-build
+rm -rf build
 
 
 
@@ -48,8 +48,8 @@ mv gmp-6.2.0 gmp
 tar -xvf ../mpfr-4.1.0.tar.xz
 mv mpfr-4.1.0 mpfr
 #dependency are resolved , now procceed with compilation 
-mkdir gcc-build
-cd gcc-build
+mkdir build
+cd build
 ../configure --target=$LFS_TGT	\
 	--prefix=$LFS/tools	\
 	--with-glibc-version=2.11 \
@@ -69,8 +69,8 @@ cd gcc-build
 	--disbale-libvtv	  \
 	--disable-libstdcxx	  \
 	--enable-lanuages=c,c++
-make 
-make install 
+make -j8
+make install
 #Note 
 cd ../
 cat gcc/limitx.h gcc/glimits.h gcc/limity.h \
@@ -115,5 +115,150 @@ esac
 
 #?patching the glibc
 patch -Np1 -i ../glibc-2.32-fhs-1.patch
+
+tar -xvf glibc-2.32.tar.xz
+cd glibc-2.32
+mkdir -v build
+cd build
+../configure   			\
+	--prefix=/usr		\
+	--host=$LFS_TGT		\
+	--build=$(../scripts/config.guess)	\
+	--enable-kernel=3.2	\
+	--with-headers=$LFS/usr/include		\
+	lib_cv_slibdir=/lib
+
+make -j8
+make DESTDIR=$LFS install
+
+cd ../..
+rm -rf glibc-2.32
+
+#At this point of time to stop and ensure that the basic function( compling and linking ) of the new programs are working as expected.
+#To perform the sanity check , run the following commands
+echo 'init main() {}' >dummy.c
+$LFS_TGT-gcc dummy.c
+readelf -l a.out | grep '/ld-linux'
+#put put of the program should be " [Requesting program interpreter: /lib64/ld-linux-x86-64.so.2 ]
+rm -rf dummy.c a.out
+
+
+
+#? Now that our toolchain is complete.
+#finilize the installation of limits.h header.
+#for this run the utility 
+$LFS/tools/libexec/gcc/$LFS_TGT/10.2/install-tools/mkheaders
+
+
+#/* libstdc++ from GCC-10.2.0, pass 1
+tar -xvf gcc-10.2.0.tar.xz
+cd gcc-10.2.0
+mkdir build
+cd build
+../configure 			\
+	--host=$LFS_TGT		\
+	--build=$(../config.guess)	\
+	--prefix=/usr			\
+	--disable-multilib		\
+	--disable-nls			\
+	--disbale-libstdcxx-pch		\
+	--with-gxx-include-dir=/tools/$LFS_TGT/include/c++/10.2.0
+
+make -j8
+make DESTDIR=$LFS install
+
+cd ../../
+rm -rf gcc-10.2.0
+
+#-------------------------------------------------------------------compiling the temporary tools ------------------------------------------------------------------
+echo "Started compiling the temporary tools"
+sleep 5
+
+#1. /* M4 (macro processor )*/
+#first make some fixes introduces by glibc-2.28
+sed -i 's/IO-ftrylockfile/IO_EOF_SEEN/' lib/*.c
+echo "#define _IO_IN_BACKUP 0x100" >> lib/stdio-impl.h
+#let's compile the M4
+tar -xvf m4-1.4.18.tar.xz
+cd m4-1.4.18
+./configure 			\
+	--prefix=/usr		\
+	--host=$LFS_TGT		\
+	--build=$(build-aux/cinfig.guess)
+
+make -j8 
+make DESTDIR=$LFS install
+
+cd ../
+rm -rf m4-1.4.18
+
+
+
+#2. /*Ncurces */
+#first, ensure that gawk is found first during configuration 
+sed -i s/mawk// configure 
+#then, run the following commands to build the "tic" program on the build host
+mkdir build 
+pushd build
+../configure 
+make -C include
+make -C progs tic
+popd
+
+#compiling the ncurses
+tar -xvf ncurses-6.2.tar.gz
+cd ncurses-6.2
+./configure 			\
+	--prefix=/usr		\
+	--host=$LFS_TGT		\
+	--build=$(./config.guess) \
+	--mandir=/usr/share/man  	\
+	--with-manpage-format=normal	\
+	--with-shared 		\
+	--without-debug		\
+	--without-debug		\
+	--without-ada		\
+	--without-normal	\
+	--enable-widec		
+
+make -j8
+make DESTDIR=$LFS TIC_PATH=$(pwd)/build/progs/tic/ install
+echo "INPUT(-lncursesw)" > $LFS/usr/lib/libncurses.so
+mv -v $LFS/usr/lib/incursesw.so.6* $LFS/lib
+ln -sfv ../../lib/$(readlink $LFS/usr/lib/libncursesw.so) $LFS/usr/lib/ncursesw.so
+
+cd ../
+rm -rf ncurses-6.2
+
+#/*Bash */
+tar -xvf bash-5.0.tar.gz
+cd bash-5.0
+./configure 			\
+	--prefix=/usr 		\
+	--build=$(support/config.guess)	\
+	--host=$LFS_TGT			\
+	--without-bash-malloc
+make -j8
+make DESTDIR=$LFS install
+
+#move the ececutable as expected 
+mv $LFS/usr/bin/bash $LFS/bin/bash
+ln -sv bash $LFS/bin/sh
+
+cd ../
+rm -rf bash-5.0
+
+#/*Coreutils */
+tar -xvf coreutils-8.32.tar.xz
+cd coreutils-8.32
+./configure 			\
+	--prefix=/usr		\
+	--host=$LFS_TGT		\
+	--build=$(build-aux/config.guess)	\
+	--enable-install-program=hostname 	\
+	--enable-no-install-program=kill,uptime
+make -j8
+make DESTDIR=$LFS install
+#move programs in final expected location
 
 
