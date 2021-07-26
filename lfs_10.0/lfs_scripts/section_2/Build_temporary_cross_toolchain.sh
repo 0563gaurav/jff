@@ -9,10 +9,11 @@
 #/*start compiling toolchain */
 
 echo "Welcome to this advancture"
-sleep 10
+sleep 5
 
 #/*Binutils*/
-
+echo "Binutils is being compiled"
+sleep 5
 cd $LFS/sources
 tar -xvf binutils-2.35.tar.xz
 cd binutils-2.35
@@ -33,6 +34,10 @@ rm -rf binutils-2.53
 
 
 #/*GCC */
+echo 
+echo 
+echo 
+echo
 echo "Starting with gcc package ...."
 sleep 10
 
@@ -47,6 +52,13 @@ tar -xvf ../gmp-6.2.0.tar.xz
 mv gmp-6.2.0 gmp
 tar -xvf ../mpfr-4.1.0.tar.xz
 mv mpfr-4.1.0 mpfr
+#on x84_64 hosts, set the defoult dirctory  name for 64-bit libraries to "lib"
+case $(uname -m) in
+	x86_64) 
+		sed -e '/m64=/s/lib64/lib/' \
+			-i.org gcc/config/i386/t-linux64
+	;;
+esac
 #dependency are resolved , now procceed with compilation 
 mkdir build
 cd build
