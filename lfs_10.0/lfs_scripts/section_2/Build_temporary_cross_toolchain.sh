@@ -13,7 +13,7 @@ sleep 10
 
 #/*Binutils*/
 
-$LFS/sources
+cd $LFS/sources
 tar -xvf binutils-2.35.tar.xz
 cd binutils-2.35
 mkdir build
@@ -26,7 +26,7 @@ cd build
 make 
 make install 
 cd ../../
-rm -rf build
+rm -rf binutils-2.53
 
 
 
@@ -41,7 +41,7 @@ tar -xvf gcc-10.2.0.tar.xz
 cd gcc-10.2.0 
 #? dependency resolve 
 #gcc package dependes on mpc , mpfr and gmp packages 
-tar -xvf../mpc-1.1.0.tar.gz
+tar -xvf ../mpc-1.1.0.tar.gz
 mv mpc-1.1.0 mpc
 tar -xvf ../gmp-6.2.0.tar.xz
 mv gmp-6.2.0 gmp
@@ -123,7 +123,7 @@ cd build
 ../configure   			\
 	--prefix=/usr		\
 	--host=$LFS_TGT		\
-	--build=$(../scripts/config.guess)	\
+	--build=$(./scripts/config.guess)	\
 	--enable-kernel=3.2	\
 	--with-headers=$LFS/usr/include		\
 	lib_cv_slibdir=/lib
@@ -140,7 +140,7 @@ echo 'init main() {}' >dummy.c
 $LFS_TGT-gcc dummy.c
 readelf -l a.out | grep '/ld-linux'
 #put put of the program should be " [Requesting program interpreter: /lib64/ld-linux-x86-64.so.2 ]
-rm -rf dummy.c a.out
+rm  dummy.c a.out
 
 
 
